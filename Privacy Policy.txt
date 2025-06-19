@@ -1,0 +1,46 @@
+🔐 Privacy Policy
+Effective Date: 05.18.2025
+
+This Privacy Policy describes how the Turf Bot collects, uses, and stores user data.
+
+1. Data Collection
+1.1. Information Collected
+The Bot may collect the following data:
+- Discord user ID
+- Discord role and channel IDs
+- Telegram API credentials (api_id, api_hash, and username)
+- Message templates and personalization settings
+
+1.2. Storage Method
+Collected data is stored in local JSON configuration files (user_configs.json, turf_config.json, etc.) on the server hosting the bot.
+
+2. Data Usage
+2.1. Functional Use
+Data is used solely for:
+- Managing turf war participant lists
+- Creating and deleting Discord roles
+- Formatting messages
+- Relaying Telegram messages to Discord
+
+2.2. No Data Sharing
+Data is never sold, rented, or shared with third parties.
+
+3. Data Deletion
+3.1. User-Initiated Deletion
+Users can delete all their stored data using the /telegram_clear_files command. This removes:
+- Telegram credentials
+- Webhooks created by the bot
+- Message settings and configurations
+
+3.2. Automatic Cleanup
+The Bot may periodically clear data or restart, which may lead to the deletion of temporary in-memory data.
+
+4. Security
+4.1. Local-Only Storage
+All sensitive data is stored locally and never transmitted externally beyond what’s required for the Bot’s core functionality.
+
+4.2. No Guarantees
+While reasonable precautions are taken, usage of Telegram integration and credential storage is at your own risk.
+
+📬 Contact
+For questions or concerns, please contact epicdream23 via Discord.

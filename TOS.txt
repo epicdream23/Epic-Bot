@@ -1,0 +1,35 @@
+📜 Terms of Service (TOS)
+Effective Date: 05.18.2025
+
+These Terms of Service ("Terms") govern your use of the Discord bot known as Turf Bot ("the Bot"). By using the Bot, you agree to the following terms:
+
+1. General Use
+1.1. Purpose
+The Bot is designed to help Discord server administrators manage participation in turf wars and optionally forward messages from Telegram.
+
+1.2. Acceptance
+By inviting or using the Bot, you agree to these Terms and confirm that you have permission to manage the server where the Bot is used.
+
+2. User Requirements
+2.1. Permissions
+You must have administrative rights to perform operations such as managing roles, channels, and webhooks through the Bot.
+
+2.2. Compliance
+You agree to comply with Discord’s Terms of Service and Community Guidelines.
+
+2.3. Prohibited Use
+Abuse of the Bot—such as spamming, role misuse, or unauthorized access to Telegram features—may result in being permanently blocked from using the Bot.
+
+3. Bot Availability
+3.1. Service Level
+The Bot is provided “as is” and without warranty of uptime, availability, or functionality.
+
+3.2. Restarts
+The Bot may automatically restart (e.g., every 30 minutes) to maintain stability and performance.
+
+4. Ownership and Maintenance
+4.1. Developer
+The Bot is developed and maintained privately by an individual.
+
+4.2. Support
+Support is provided on a best-effort basis and is not guaranteed.
