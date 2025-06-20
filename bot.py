@@ -35,7 +35,7 @@ REMINDER_MESSAGES_FILE = "reminder_messages.json"
 MAX_MAIN_LIST_SLOTS = 15
 ROLE_LIST_IN_NAME = "Teilnehmer"
 ROLE_LIST_RESERVE_NAME = "Reserve"
-AUTO_LIST_POST_DELAY = 3 
+AUTO_LIST_POST_DELAY = 1 
 
 # Load initial configurations
 user_configs = json.load(open(TELEGRAM_CONFIG_FILE)) if os.path.exists(TELEGRAM_CONFIG_FILE) else {}
@@ -57,7 +57,6 @@ if os.path.exists(REMINDER_MESSAGES_FILE):
         bot.reminder_messages = {int(k): v for k, v in json.load(f).items()}
 else:
     bot.reminder_messages = {}
-
 
 DEFAULT_MESSAGE_PREFIX = "\u2728 Incoming turf report:"
 DEFAULT_PRESET = "**Attacker:** {attacker}\n**Begin:** {begin}\n**Zonename:** {zonename}\n**Zonenumber:** {zonenumber}"
@@ -89,7 +88,6 @@ def parse_duration(duration_str: str) -> timedelta | None:
     return timedelta(seconds=total_seconds) if total_seconds > 0 else None
 
 # ===== Ban Management System =====
-
 class BanDMView(ui.View):
     def __init__(self, ban_manager_instance):
         super().__init__(timeout=None)
@@ -112,24 +110,19 @@ class BanDMView(ui.View):
         if found_guild_id:
             await self.manager.update_ban_dm(found_guild_id, user_id)
             
-            # Check the status *after* the update attempt to provide accurate feedback
             ban_info = self.manager.active_bans.get((found_guild_id, user_id))
             if ban_info and ban_info.get("dm_message_id"):
-                # Check if ban is not yet expired
                 unban_time = datetime.datetime.fromtimestamp(ban_info["unban_timestamp"], tz=datetime.timezone.utc)
                 if unban_time > datetime.datetime.now(datetime.timezone.utc):
                     await interaction.followup.send("Countdown in deiner DM wurde aktualisiert.", ephemeral=True)
                 else:
-                    # Ban has expired, DM should reflect this after update_ban_dm
                     await interaction.followup.send("Dein Bann ist abgelaufen. Die DM wurde aktualisiert.", ephemeral=True)
             else:
-                # Ban was removed or DM ID cleared during/after update_ban_dm (e.g., message deleted by user)
                 await interaction.followup.send("Dieser Bann ist inzwischen abgelaufen oder die DM konnte nicht mehr gefunden/aktualisiert werden.", ephemeral=True)
         else:
-            # Ban was not found in active_bans (already expired and cleaned up)
             try:
                 await interaction.followup.send("Dieser Bann ist abgelaufen oder wurde aufgehoben.", ephemeral=True)
-            except discord.NotFound: # Should be rare if defer succeeded
+            except discord.NotFound:
                 pass
 
 class BanManager:
@@ -144,10 +137,9 @@ class BanManager:
                 with open(ACTIVE_BANS_FILE, "r") as f:
                     raw_data = json.load(f)
                     self.active_bans = {(int(k.split(',')[0]), int(k.split(',')[1])): v for k, v in raw_data.items()}
-                    # Ensure status field exists for backward compatibility
                     for ban_data_val in self.active_bans.values():
                         if "status" not in ban_data_val:
-                            ban_data_val["status"] = "active" # Default for old entries
+                            ban_data_val["status"] = "active"
                 print(f"[BanManager] {len(self.active_bans)} aktive Banns geladen.")
             except Exception as e:
                 print(f"[ERROR] Aktive Banns konnten nicht geladen werden: {e}")
@@ -390,7 +382,7 @@ class BanManager:
             print(f"[BanManager] Konnte keinen geeigneten Channel zum Erstellen einer Einladung für {user.id} finden.")
 
         # --- DM Logic ---
-        dm_action_feedback = "" # For admin feedback
+        dm_action_feedback = ""
         original_dm_edited_successfully = False
 
         if ban_data and ban_data.get("dm_message_id"):
@@ -449,7 +441,6 @@ class BanManager:
                 print(f"[BanManager] User {user_id} in Guild {guild_id} ist entbannt, wartet auf Rollenwiederherstellung bei Rejoin.")
         print("[BanManager] Bann-Sessions initialisiert.")
 
-
 class UnbanSelectView(ui.View):
     def __init__(self, ban_manager_instance: BanManager, bot_instance: MyBot, banned_entries: list[discord.BanEntry], reason: str, original_interaction: Interaction):
         super().__init__(timeout=180)
@@ -498,9 +489,7 @@ class UnbanSelectView(ui.View):
         self.stop()
         await self.original_interaction.edit_original_response(content=f"Entbannungsaktion für {user_to_unban.mention} verarbeitet. Details in der Bestätigungsnachricht.", view=None)
 
-
 # ===== Persistent List System =====
-
 class PersistentListManager:
     def __init__(self, bot_instance: MyBot):
         self.bot = bot_instance
@@ -543,7 +532,6 @@ class PersistentListManager:
             print(f"[ListManager] Forbidden to manage roles for {member.display_name}.")
         except Exception as e:
             print(f"[ListManager] Error updating roles for {member.display_name}: {e}")
-
 
     def load_lists_data(self):
         if os.path.exists(PERSISTENT_LIST_DATA_FILE):
@@ -835,7 +823,6 @@ def fix_attacker_casing(name):
     return ' '.join(part if part.lower() in preserved else part.capitalize() for part in parts)
 
 # ===== TELEGRAM LOGIN HANDLER & OTHER BOT FUNCTIONALITY =====
-
 async def daily_telegram_notice():
     await bot.wait_until_ready()
     while not bot.is_closed():
@@ -942,10 +929,9 @@ async def start_telegram_client(user_id: str, interaction_user: User | Member | 
             if client.is_connected(): await client.disconnect()
 
 
-# ===== COMMANDS =====
+# ============================= COMMANDS =================================
 
 # ===== Kick & Ban Commands =====
-
 @bot.tree.command(name="kick", description="Kickt ein Mitglied und sendet ihm eine erneute Einladung.")
 @app_commands.describe(member="Das zu kickende Mitglied", reason="Der Grund für den Kick")
 @app_commands.checks.has_permissions(kick_members=True)
@@ -1111,7 +1097,6 @@ async def list_lock_command(interaction: Interaction):
 
     await interaction.followup.send(final_response_message, ephemeral=True)
 
-
 @bot.tree.command(name="list_refresh", description="Aktualisiert die Anzeige der Teilnahmeliste manuell.")
 @app_commands.checks.has_permissions(manage_messages=True)
 async def list_refresh_command(interaction: Interaction):
@@ -1196,11 +1181,10 @@ async def turf_edit_default_preset_message(interaction: discord.Interaction, mes
 
 @bot.tree.command(name="telegram_user_files_clear", description="Löscht ALLE deine persönlichen Telegram-Daten vom Bot.")
 async def telegram_user_files_clear(interaction: Interaction):
-    await interaction.response.defer(ephemeral=True) # Sofort antworten, um Timeouts zu vermeiden
+    await interaction.response.defer(ephemeral=True)
     user_id_str = str(interaction.user.id)
     summary_lines = [f"🧹 **Aufräumarbeiten für {interaction.user.mention} abgeschlossen:**"]
 
-    # 1. Aktiven Telegram-Client trennen und entfernen
     if client := bot.telegram_clients.pop(user_id_str, None):
         if client.is_connected():
             await client.disconnect()
@@ -1208,7 +1192,6 @@ async def telegram_user_files_clear(interaction: Interaction):
     else:
         summary_lines.append("👌 Keine aktive Telegram-Verbindung zum Trennen gefunden.")
 
-    # 2. Zugehörigen Discord-Webhook löschen
     user_conf = user_configs.get(user_id_str)
     if user_conf and (webhook_url := user_conf.get("webhook_url")):
         try:
@@ -1223,7 +1206,6 @@ async def telegram_user_files_clear(interaction: Interaction):
     else:
         summary_lines.append("👌 Kein Webhook in deiner Konfiguration gefunden.")
 
-    # 3. Einträge aus Konfigurationsdateien entfernen
     if user_configs.pop(user_id_str, None):
         save_telegram_configs(user_configs)
         summary_lines.append(f"✅ Konfiguration aus `{TELEGRAM_CONFIG_FILE}` entfernt.")
@@ -1236,7 +1218,6 @@ async def telegram_user_files_clear(interaction: Interaction):
     else:
         summary_lines.append(f"👌 Keine Presets in `{PRESET_FILE}` gefunden.")
 
-    # 4. Telegram-Session-Datei löschen
     session_file = f"user_{user_id_str}.session"
     if os.path.exists(session_file):
         try:
@@ -1249,7 +1230,6 @@ async def telegram_user_files_clear(interaction: Interaction):
     
     summary_lines.append("\nDu kannst nun den Befehl `/telegram_set_channel` erneut ausführen, um alles neu einzurichten.")
     await interaction.followup.send("\n".join(summary_lines), ephemeral=True)
-
 
 @bot.tree.command(name="telegram_set_channel", description="Setzt den Discord-Channel für Telegram-Kriegswarnungen.")
 @app_commands.describe(channel="Der Channel, in den die Warnungen gepostet werden.")
