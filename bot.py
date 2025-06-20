@@ -11,18 +11,16 @@ from discord.ext import commands
 from discord import app_commands, Webhook, SelectOption, ui, Embed, Color, Interaction, ButtonStyle, TextStyle, Member, User, VoiceChannel, TextChannel 
 from telethon import TelegramClient, events 
 
-# ===== MyBot Klasse zur Verbesserung der Struktur =====
 class MyBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Attribute mit Typ-Hinweisen definieren, um Pylance-Fehler zu beheben
         self.moving_tasks: dict[tuple[int, int], asyncio.Task] = {}
         self.reminder_messages: dict[int, str] = {}
         self.telegram_clients: dict[str, TelegramClient] = {}
 
 # Configuration Constants
-DISCORD_TOKEN = "" # WICHTIG: Halte deinen echten Token geheim!
-OWNER_ID = 827620956075065375 # Deine Discord User ID
+DISCORD_TOKEN = ""
+OWNER_ID = 827620956075065375 
 WEBHOOK_AVATAR_PATH = "static/img/Turf_bot.jpg"
 
 # JSON Files
@@ -37,8 +35,7 @@ REMINDER_MESSAGES_FILE = "reminder_messages.json"
 MAX_MAIN_LIST_SLOTS = 15
 ROLE_LIST_IN_NAME = "Teilnehmer"
 ROLE_LIST_RESERVE_NAME = "Reserve"
-AUTO_LIST_POST_DELAY = 3 # Seconds
-
+AUTO_LIST_POST_DELAY = 3 
 
 # Load initial configurations
 user_configs = json.load(open(TELEGRAM_CONFIG_FILE)) if os.path.exists(TELEGRAM_CONFIG_FILE) else {}
@@ -106,10 +103,8 @@ class BanDMView(ui.View):
         user_id = interaction.user.id
         
         found_guild_id = None
-        # Iterate over a copy of keys to avoid runtime modification issues
         for (gid, uid) in list(self.manager.active_bans.keys()):
             if uid == user_id:
-                # Double-check if the ban still exists in the live dictionary
                 if (gid, uid) in self.manager.active_bans:
                     found_guild_id = gid
                     break
@@ -157,7 +152,6 @@ class BanManager:
             except Exception as e:
                 print(f"[ERROR] Aktive Banns konnten nicht geladen werden: {e}")
                 self.active_bans = {}
-        # Ensure all active_bans have a status, even if file didn't exist or was empty
     
     def save_bans(self):
         try:
@@ -186,7 +180,7 @@ class BanManager:
         roles_to_add = []
         for role_id in role_ids_to_restore:
             role = guild.get_role(role_id)
-            if role and role != guild.default_role: # Ensure role exists and is not @everyone
+            if role and role != guild.default_role:
                 roles_to_add.append(role)
         
         if roles_to_add:
@@ -219,7 +213,6 @@ class BanManager:
     async def _handle_ban_session(self, guild_id: int, user_id: int):
         ban_key = (guild_id, user_id)
 
-        # Initial check if the ban is still valid and active for this session to handle
         if not (ban_key in self.active_bans and self.active_bans[ban_key].get("status") == "active"):
             return
 
@@ -231,7 +224,7 @@ class BanManager:
             if now >= unban_time:
                 print(f"[BanManager] Bannzeit für User {user_id} abgelaufen. Starte Entbannung.")
                 guild = self.bot.get_guild(guild_id)
-                user = await self.bot.fetch_user(user_id) # User object, not member
+                user = await self.bot.fetch_user(user_id)
 
                 if not guild or not user:
                     print(f"[BanManager] Guild {guild_id} oder User {user_id} nicht gefunden. Entferne Bann-Eintrag.")
@@ -256,28 +249,27 @@ class BanManager:
                         try:
                             dm_channel = await user.create_dm()
                             message = await dm_channel.fetch_message(ban_data["dm_message_id"])
-                            # Pass "unbanned_pending_roles" if roles are to be restored, else "expired"
                             status_for_embed = "unbanned_pending_roles" if "roles_to_restore" in ban_data and ban_data["roles_to_restore"] else "expired"
                             expired_embed = self._generate_ban_embed(guild, ban_data["reason"], ban_data["unban_timestamp"], status_for_embed)
                             expired_embed.add_field(name="Hier wieder beitreten", value=invite_link or "Einladung konnte nicht erstellt werden. Bitte kontaktiere einen Admin.")
                             await message.edit(embed=expired_embed, view=None) # View is removed as ban is over
                         except (discord.NotFound, discord.Forbidden): pass
 
-                    member = guild.get_member(user_id) # Fetch member object
+                    member = guild.get_member(user_id)
                     if member and "roles_to_restore" in ban_data and ban_data["roles_to_restore"]:
                         print(f"[BanManager] User {user_id} ist bereits im Server {guild.name}. Versuche Rollenwiederherstellung.")
                         await self._restore_roles(member, ban_data["roles_to_restore"])
-                        self.active_bans.pop(ban_key, None) # Fully remove entry
+                        self.active_bans.pop(ban_key, None)
                         print(f"[BanManager] Rollenwiederherstellung für {user_id} versucht, Bann-Eintrag entfernt.")
                     elif "roles_to_restore" in ban_data and ban_data["roles_to_restore"]:
                         ban_data["status"] = "unbanned_pending_roles"
                         print(f"[BanManager] User {user_id} nicht im Server {guild.name}. Bann als 'unbanned_pending_roles' markiert.")
-                    else: # No roles to restore
-                        self.active_bans.pop(ban_key, None) # Fully remove entry
+                    else:
+                        self.active_bans.pop(ban_key, None)
                     self.save_bans()
-                    return # End task for this ban
+                    return 
 
-                except discord.NotFound: # Unknown Ban
+                except discord.NotFound:
                     print(f"[BanManager] User {user_id} war bereits in Guild {guild.id} entbannt (oder Bann nicht gefunden).")
                     member = guild.get_member(user_id)
                     if member and "roles_to_restore" in ban_data and ban_data["roles_to_restore"]:
@@ -293,33 +285,28 @@ class BanManager:
                     return
                 except discord.Forbidden:
                     print(f"[BanManager] Keine Berechtigung zum Entbannen von User {user_id} in Guild {guild.id}.")
-                    # If we can't unban, we can't proceed. Keep as active for now, admin might fix perms.
-                    # Or, if roles are present, mark as pending so if manually unbanned, roles can be restored.
                     if "roles_to_restore" in ban_data and ban_data["roles_to_restore"]:
-                        ban_data["status"] = "unbanned_pending_roles" # Hope for manual unban + rejoin
+                        ban_data["status"] = "unbanned_pending_roles"
                         self.save_bans()
                     return 
                 except Exception as e:
                     print(f"[BanManager] Kritischer Fehler beim Entbannen von User {user_id}: {e}")
-                    # Potentially mark as pending if roles exist, to allow for manual recovery
                     if "roles_to_restore" in ban_data and ban_data["roles_to_restore"]:
                         ban_data["status"] = "unbanned_pending_roles"
                         self.save_bans()
                     return
 
             seconds_remaining = (unban_time - now).total_seconds()
-            max_sleep_interval = 900 # 15 Minuten für periodische DM-Updates
+            max_sleep_interval = 900 
             sleep_duration = max(1, min(seconds_remaining + 1, max_sleep_interval))
             
             print(f"[BanManager] Nächste Prüfung für User {user_id} in {int(sleep_duration)} Sekunden.")
             await asyncio.sleep(sleep_duration)
             
-            # After sleep, check if ban is still active before updating DM
-            # (it might have been resolved by on_member_join after a restart, or manually)
             if not (ban_key in self.active_bans and self.active_bans[ban_key].get("status") == "active"):
-                return # Ban state changed, terminate this task
+                return 
             
-            if datetime.datetime.now(datetime.timezone.utc) < unban_time: # Only update DM if ban is still ongoing
+            if datetime.datetime.now(datetime.timezone.utc) < unban_time:
                  await self.update_ban_dm(guild_id, user_id)
 
     async def start_ban(self, interaction: Interaction, member: Member, duration: timedelta, reason: str):
@@ -334,7 +321,6 @@ class BanManager:
         view = BanDMView(self)
         embed = self._generate_ban_embed(guild, reason, unban_timestamp, status="active")
 
-        # Get roles before banning
         roles_to_restore = [role.id for role in member.roles if role.id != guild.id] # Exclude @everyone
 
         dm_message = None
@@ -367,8 +353,6 @@ class BanManager:
         if not interaction.guild: return
         guild = interaction.guild
 
-        # Deferral is handled by the button's interaction if called from UnbanSelectView
-
         ban_key = (guild.id, user.id)
         ban_data = self.active_bans.pop(ban_key, None) # Remove from active bans immediately
         if ban_data:
@@ -383,21 +367,17 @@ class BanManager:
         except discord.NotFound:
             print(f"[BanManager] User {user.id} war nicht in Guild {guild.id} gebannt (Discord API).")
             await interaction.followup.send(f"ℹ️ {user.mention} war auf diesem Server nicht gebannt.", ephemeral=True)
-            return # Exit if user wasn't banned on Discord
+            return
         except discord.Forbidden:
             print(f"[BanManager] Keine Berechtigung zum manuellen Entbannen von User {user.id} in Guild {guild.id}.")
             await interaction.followup.send("Ich habe keine Berechtigung, dieses Mitglied zu entbannen.", ephemeral=True)
-            # If we couldn't unban, maybe put the ban entry back if it existed? Or just log.
-            # For simplicity, we'll just log the failure and not restore the JSON entry.
             return
         except Exception as e:
             print(f"[BanManager] Fehler beim manuellen Entbannen von User {user.id}: {e}")
             await interaction.followup.send(f"Ein Fehler ist beim Entbannen aufgetreten: {e}", ephemeral=True)
             return
 
-        # If unban was successful, try sending DM and invite
         invite_link = None
-        # Try to create an invite in a more reliable way
         target_invite_channel = guild.system_channel or \
                                 next((c for c in guild.text_channels if c.permissions_for(guild.me).create_instant_invite), None)
         if target_invite_channel:
@@ -409,7 +389,7 @@ class BanManager:
         else:
             print(f"[BanManager] Konnte keinen geeigneten Channel zum Erstellen einer Einladung für {user.id} finden.")
 
-        # --- DM Logic: Try to edit original, fallback to new ---
+        # --- DM Logic ---
         dm_action_feedback = "" # For admin feedback
         original_dm_edited_successfully = False
 
@@ -428,13 +408,13 @@ class BanManager:
                 else:
                     unban_embed.add_field(name="Hier wieder beitreten", value="Einladung konnte nicht erstellt werden. Bitte kontaktiere einen Admin.")
                 
-                await original_dm_message.edit(embed=unban_embed, view=None) # Remove old view (BanDMView)
+                await original_dm_message.edit(embed=unban_embed, view=None)
                 original_dm_edited_successfully = True
                 dm_action_feedback = "\nℹ️ Die ursprüngliche Bann-DM wurde aktualisiert."
                 print(f"[BanManager] Originale Bann-DM für {user.id} bearbeitet.")
             except (discord.NotFound, discord.Forbidden) as e:
                 print(f"[BanManager] Konnte originale Bann-DM für {user.id} nicht bearbeiten: {e}. Sende neue DM.")
-            except Exception as e: # Catch other potential errors during edit
+            except Exception as e:
                 print(f"[BanManager] Unerwarteter Fehler beim Bearbeiten der originalen Bann-DM für {user.id}: {e}. Sende neue DM.")
 
         if not original_dm_edited_successfully:
@@ -461,7 +441,7 @@ class BanManager:
         print("[BanManager] Initialisiere Bann-Sessions...")
         if not self.active_bans: return
 
-        for (guild_id, user_id), ban_data in list(self.active_bans.items()): # Iterate over items
+        for (guild_id, user_id), ban_data in list(self.active_bans.items()):
             if ban_data.get("status") == "active":
                 print(f"[BanManager] Setze aktive Bann-Session für User {user_id} in Guild {guild_id} fort.")
                 asyncio.create_task(self._handle_ban_session(guild_id, user_id))
@@ -477,19 +457,18 @@ class UnbanSelectView(ui.View):
         self.bot_instance = bot_instance
         self.selected_user_id: int | None = None
         self.reason = reason
-        self.original_interaction = original_interaction # To edit the original message later
+        self.original_interaction = original_interaction
 
         options = []
         if banned_entries:
             for ban_entry in banned_entries:
                 user = ban_entry.user
                 label = f"{user.name}#{user.discriminator}"
-                if len(label) > 100: # Max label length
+                if len(label) > 100:
                     label = label[:97] + "..."
                 options.append(SelectOption(label=label, value=str(user.id), description=f"Grund: {ban_entry.reason}"[:100] if ban_entry.reason else "Kein Grund angegeben."))
         
-        if not options: # Should not happen if banned_entries is checked before creating view, but as a safeguard
-            # Add a disabled placeholder if no users
+        if not options:
             options.append(SelectOption(label="Keine Benutzer zum Entbannen", value="_disabled", default=True))
             self.unban_button.disabled = True
 
@@ -499,7 +478,7 @@ class UnbanSelectView(ui.View):
 
     async def select_callback(self, interaction: Interaction):
         self.selected_user_id = int(self.user_select.values[0])
-        await interaction.response.defer() # Acknowledge selection, button press will do the action
+        await interaction.response.defer()
 
     @ui.button(label="Ausgewählten Benutzer entbannen", style=ButtonStyle.danger, row=1)
     async def unban_button(self, interaction: Interaction, button: ui.Button):
@@ -507,7 +486,6 @@ class UnbanSelectView(ui.View):
             await interaction.response.send_message("Bitte wähle zuerst einen Benutzer aus der Liste aus.", ephemeral=True)
             return
 
-        # Defer the button's interaction before calling manual_unban
         await interaction.response.defer(ephemeral=True)
 
         user_to_unban = await self.bot_instance.fetch_user(self.selected_user_id)
@@ -515,11 +493,9 @@ class UnbanSelectView(ui.View):
             await interaction.followup.send("Benutzer nicht gefunden.", ephemeral=True)
             return
             
-        # Call manual_unban with the button's interaction
         await self.ban_manager.manual_unban(interaction, user_to_unban, self.reason)
-        # The manual_unban method now handles sending the followup message.
         
-        self.stop() # Stop listening for further interactions
+        self.stop()
         await self.original_interaction.edit_original_response(content=f"Entbannungsaktion für {user_to_unban.mention} verarbeitet. Details in der Bestätigungsnachricht.", view=None)
 
 
@@ -826,6 +802,7 @@ def save_reminder_messages(data):
             json.dump(data, f, indent=4)
     except Exception as e:
         print(f"[ERROR] Failed to save reminder messages: {e}")
+
 # ===== Parsing and Formatting =====
 def parse_turf_message(msg):
     if not msg.startswith("Auf eure Organisation"): return None
@@ -875,7 +852,6 @@ async def daily_telegram_notice():
                     print(f"[TelegramNotice] Error for user {user_id_str}: {e}")
 
 # ===== MODIFIED FUNCTION =====
-# Die Funktion akzeptiert nun `is_interactive_setup`, um den Spam beim Neustart zu verhindern.
 async def start_telegram_client(user_id: str, interaction_user: User | Member | None, is_interactive_setup: bool = False):
     config = user_configs.get(user_id)
     if not config: 
@@ -908,7 +884,6 @@ async def start_telegram_client(user_id: str, interaction_user: User | Member | 
         return
 
     if not await client.is_user_authorized():
-        # Der interaktive Login-Prozess wird nur gestartet, wenn is_interactive_setup True ist.
         if is_interactive_setup and interaction_user:
             try:
                 await interaction_user.send("Bitte gib deine **Telegram Telefonnummer** ein (z.B. +491234567890):")
@@ -926,7 +901,6 @@ async def start_telegram_client(user_id: str, interaction_user: User | Member | 
                 if client.is_connected(): await client.disconnect()
                 return
         else:
-            # Wenn nicht interaktiv (z.B. beim Bot-Start), wird hier abgebrochen, ohne den User anzuschreiben.
             if client.is_connected(): await client.disconnect()
             return
 
@@ -1049,8 +1023,6 @@ async def unban_command(interaction: Interaction, reason: str = "Manuell entbann
     await interaction.response.defer(ephemeral=True) # Defer early as fetching bans can take time
 
     banned_users_entries = []
-    # Discord's Select menu has a limit of 25 options.
-    # For more, pagination or a different UI (e.g., modal for ID input) would be needed.
     async for ban_entry in interaction.guild.bans(limit=25):
         banned_users_entries.append(ban_entry)
 
@@ -1285,17 +1257,14 @@ async def telegram_user_files_clear(interaction: Interaction):
 async def turf_set_channel(interaction: Interaction, channel: TextChannel):
     if not interaction.guild: return
     
-    # 1. SOFORT auf die Interaktion reagieren, um einen Timeout zu verhindern.
     await interaction.response.defer(ephemeral=True)
     
     if not isinstance(interaction.user, Member): return
     user = interaction.user
     user_id_str = str(user.id)
 
-    # 2. Erste sichtbare Nachricht an den Benutzer senden. Da wir 'defer' verwendet haben, nutzen wir 'followup'.
     await interaction.followup.send(f"✅ Turf-Alarm-Channel auf {channel.mention} gesetzt. Ich sende dir jetzt eine DM für die Konfiguration.", ephemeral=True)
     
-    # Fall 1: Der Benutzer hat bereits eine Konfiguration.
     if user_id_str in user_configs and user_configs[user_id_str].get("webhook_url"):
         user_configs[user_id_str]["guild_id"] = interaction.guild.id
         save_telegram_configs(user_configs)
@@ -1305,7 +1274,6 @@ async def turf_set_channel(interaction: Interaction, channel: TextChannel):
         await start_telegram_client(user_id_str, user, is_interactive_setup=True)
         return
         
-    # Fall 2: Komplette Neueinrichtung für einen Benutzer.
     try:
         await user.send(f"Hallo! Wir richten jetzt deinen Telegram-Forwarder für den Server '{interaction.guild.name}' ein.")
         
@@ -1355,7 +1323,6 @@ async def turf_set_channel(interaction: Interaction, channel: TextChannel):
         except discord.Forbidden:
             pass
     except discord.Forbidden:
-        # Dieser Fall tritt ein, wenn der Bot überhaupt keine DMs an den Benutzer senden kann.
         print(f"[ERROR] Konnte keine DM an {user.name} senden, um die Einrichtung zu starten.")
     except Exception as e:
         print(f"[TelegramSetup] Kritischer Fehler für {user.name} ({user.id}): {e}")
@@ -1375,24 +1342,20 @@ async def move(interaction: Interaction, member: Member, talk1: VoiceChannel, ta
     
     task_key = (interaction.guild.id, member.id)
     if task_key in bot.moving_tasks:
-        bot.moving_tasks[task_key].cancel() # Bestehenden Task für diesen User beenden
+        bot.moving_tasks[task_key].cancel()
     
-    # KORRIGIERTE move_loop Funktion
     async def move_loop(guild_id: int, member_id: int, vc1_id: int, vc2_id: int, move_delay: float):
         current_vc_id = vc1_id
         try:
             while True:
-                # Member-Objekt bei jeder Iteration neu holen für aktuellen Status
                 guild = bot.get_guild(guild_id)
                 if not guild: break
                 
                 target_member = guild.get_member(member_id)
-                # Prüfen, ob der Member noch auf dem Server und in einem Voice-Channel ist
                 if not target_member or not target_member.voice or not target_member.voice.channel:
                     print(f"[Move] Target {member_id} left voice. Stopping task.")
-                    break # Loop beenden, wenn der User nicht mehr im Voice ist
+                    break
                 
-                # Ziel-Channel-Objekt holen
                 channel_to_move_to = guild.get_channel(current_vc_id)
                 if not isinstance(channel_to_move_to, VoiceChannel):
                     print(f"[Move] Channel {current_vc_id} not found or not a VC. Stopping.")
@@ -1402,10 +1365,8 @@ async def move(interaction: Interaction, member: Member, talk1: VoiceChannel, ta
                     await target_member.move_to(channel_to_move_to)
                 except discord.HTTPException as e:
                     print(f"[Move] Could not move member {member_id}: {e}")
-                    # Bei einem Fehler (z.B. User disconnected) brechen wir auch ab.
                     break
                 
-                # Channel für den nächsten Move wechseln
                 current_vc_id = vc2_id if current_vc_id == vc1_id else vc1_id
                 
                 await asyncio.sleep(move_delay)
@@ -1415,7 +1376,6 @@ async def move(interaction: Interaction, member: Member, talk1: VoiceChannel, ta
             print(f"[Move] Cleaning up task for member {member_id}.")
             bot.moving_tasks.pop((guild_id, member_id), None)
             
-    # Wir übergeben IDs anstatt der vollen Objekte, um "stale" Objekte zu vermeiden
     task = asyncio.create_task(move_loop(interaction.guild.id, member.id, talk1.id, talk2.id, delay))
     bot.moving_tasks[task_key] = task
     await interaction.response.send_message(f"🚀 {member.display_name} wird bewegt.", ephemeral=False)
@@ -1436,7 +1396,7 @@ async def stopmove(interaction: Interaction, member: Member):
 @app_commands.describe(user="User to remind")
 async def reminder(interaction: Interaction, user: User):
     if not interaction.guild: return
-    message_to_send = bot.reminder_messages.get(interaction.guild.id, "This is your reminder!") # Default message if none is set
+    message_to_send = bot.reminder_messages.get(interaction.guild.id, "This is your reminder!")
     try:
         await user.send(f"📌 **Erinnerung von '{interaction.guild.name}'**:\n> {message_to_send}")
         if interaction.response.is_done():
@@ -1463,7 +1423,7 @@ async def restart_command(interaction: Interaction):
     if interaction.user.id != OWNER_ID:
         await interaction.response.send_message("🚫 Du bist nicht berechtigt.", ephemeral=True); return
     await interaction.response.defer(ephemeral=False)
-    save_reminder_messages(bot.reminder_messages) # Save reminders before restart
+    save_reminder_messages(bot.reminder_messages) 
     list_manager.save_lists_data()
     for client in bot.telegram_clients.values():
         if client.is_connected():
@@ -1526,8 +1486,6 @@ async def on_ready():
     for user_id_str in list(user_configs.keys()):
         try:
             user_obj = await bot.fetch_user(int(user_id_str))
-            # ===== MODIFIED CALL =====
-            # Ruft die Funktion nun im "nicht-interaktiven" Modus auf, um Spam zu verhindern.
             await start_telegram_client(user_id_str, user_obj, is_interactive_setup=False)
         except (ValueError, discord.NotFound):
              await start_telegram_client(user_id_str, None, is_interactive_setup=False)
@@ -1558,7 +1516,6 @@ async def on_ready():
 
 @bot.event
 async def on_member_join(member: Member):
-    # Check if this member has roles pending restoration
     ban_key = (member.guild.id, member.id)
     ban_entry = ban_manager.active_bans.get(ban_key)
 
@@ -1568,7 +1525,6 @@ async def on_member_join(member: Member):
             print(f"[on_member_join] User {member.display_name} ({member.id}) ist Guild {member.guild.name} beigetreten. Versuche Rollenwiederherstellung.")
             await ban_manager._restore_roles(member, roles_to_restore_ids)
         
-        # Clean up the ban entry as roles have been attempted or there were none
         ban_manager.active_bans.pop(ban_key, None)
         ban_manager.save_bans()
         print(f"[on_member_join] Bann-Eintrag für {member.id} nach Rejoin und Rollenversuch entfernt.")
@@ -1576,9 +1532,9 @@ async def on_member_join(member: Member):
 # ===== Auto Restart Logic =====
 async def auto_restart_timer():
     await bot.wait_until_ready() 
-    await asyncio.sleep(1800) # 30 Minuten
+    await asyncio.sleep(1800
     print("🔁 [AutoRestart] Timer abgelaufen. Starte neu...")
-    save_reminder_messages(bot.reminder_messages) # Save reminders before auto-restart
+    save_reminder_messages(bot.reminder_messages)
     list_manager.save_lists_data()
     for client in bot.telegram_clients.values():
         if client.is_connected():
