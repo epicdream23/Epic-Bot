@@ -24,9 +24,9 @@
 
 **/turf_edit_default_preset_message [message]** --> Changes the default text at the top of the message, when the bot finds an "Auf eure Organisation"
 
-**/list_lock ** --> Locks the current list
+**/list_lock** --> Locks the current list
 
-**/list_start ** --> Starts a new List
+**/list_start** --> Starts a new List
 
 **/list_refresh** --> Refreshes the current list
 
